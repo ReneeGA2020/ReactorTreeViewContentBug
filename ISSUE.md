@@ -1,4 +1,3 @@
-<!-- Paste the body below into a new GitHub issue. Title suggestion: -->
 <!-- TreeView does not render per-node `ContentElement` (ListView/GridView do) -->
 
 ### Summary
