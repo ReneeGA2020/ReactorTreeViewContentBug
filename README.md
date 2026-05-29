@@ -15,35 +15,48 @@ is never displayed. `ListView` / `GridView` with element items render fine; only
 dotnet build .\ReactorTreeViewContentBug.csproj -c Debug -p:Platform=x64
 $exe = ".\bin\x64\Debug\net10.0-windows10.0.22621.0\win-x64\ReactorTreeViewContentBug.exe"
 
-& $exe            # window opens with three EMPTY rows
-& $exe -- --check # headless: walks the visual tree, prints PASS/BUG, exit 0/2
+& $exe            # window: a BLANK TreeView above a working ListView (same content)
+& $exe -- --check # headless: detects each control's content, prints results, exit 0/2
 ```
 
-`Program.cs` builds the smallest possible tree:
+`Program.cs` puts the same kind of element content into a `TreeView` and a
+`ListView` side by side:
 
 ```csharp
-var nodes = new[]
+// TreeView — per-node ContentElement (BLANK at runtime)
+TreeView(new[]
 {
-    new TreeViewNodeData("n1") { ContentElement = Button("I am a Button"), IsExpanded = true },
-    new TreeViewNodeData("n2") { ContentElement = TextBlock("I am a TextBlock") },
-    new TreeViewNodeData("n3") { ContentElement = CheckBox(true, label: "I am a CheckBox") },
-};
-TreeView(nodes)
+    new TreeViewNodeData("n1") { ContentElement = Button("TreeView: I am a Button"), IsExpanded = true },
+    new TreeViewNodeData("n2") { ContentElement = TextBlock("TreeView: I am a TextBlock") },
+    new TreeViewNodeData("n3") { ContentElement = CheckBox(true, label: "TreeView: I am a CheckBox") },
+})
+
+// ListView — element items (renders correctly; the contrast)
+ListView(
+    Button("ListView: I am a Button"),
+    TextBlock("ListView: I am a TextBlock"),
+    CheckBox(true, label: "ListView: I am a CheckBox"))
 ```
 
 ## Expected vs. actual
 
-| | Expected | Actual |
-|---|---|---|
-| Row n1 | a `Button` | empty |
-| Row n2 | "I am a TextBlock" | empty |
-| Row n3 | a `CheckBox` | empty |
+| Control | Same element content | Expected | Actual |
+|---|---|---|---|
+| `TreeView` | `Button` / `TextBlock` / `CheckBox` | visible | **all rows blank** |
+| `ListView` | `Button` / `TextBlock` / `CheckBox` | visible | visible ✅ |
 
-`--check` output: `[check] BUG: no ContentElement content rendered — TreeView rows are empty.` (exit code 2)
+`--check` output (exit code 2):
 
-A visual-tree walk finds **zero** `Button` controls realized, confirming the
-content never enters the tree (the elements are mounted as `TreeViewNode.Content`
-but nothing hosts them).
+```text
+[check] ListView element-item content rendered:  True  (expected True)
+[check] TreeView ContentElement content rendered: False  (expected True)
+[check] BUG: TreeView ContentElement not rendered — a ListView with the same element content does render.
+```
+
+The check detects each item by the unique label text it carries (robust because
+the TreeView's internal `TreeViewList` derives from `ListView`). The `TreeView`
+content elements are mounted as `TreeViewNode.Content` but nothing hosts them, so
+they never enter the visual tree; the `ListView` content does.
 
 ## Root cause
 
